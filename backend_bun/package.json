@@ -1,0 +1,17 @@
+{
+  "name": "backend_bun",
+  "module": "index.js",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.9.4",
+    "sequelize": "^6.37.7",
+    "tedious": "^18.6.1"
+  }
+}

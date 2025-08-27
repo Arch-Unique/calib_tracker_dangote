@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calibration Tracker Admin</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Custom CSS -->
+    <style>
+      .table-responsive {
+        margin-top: 20px;
+      }
+
+      .action-buttons {
+        white-space: nowrap;
+      }
+
+      .btn-xs {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.875rem;
+        line-height: 0.5;
+        border-radius: 0.2rem;
+      }
+
+      .dashboard-card {
+        transition: transform 0.2s;
+      }
+
+      .dashboard-card:hover {
+        transform: translateY(-5px);
+      }
+
+      .loading {
+        position: relative;
+        opacity: 0.6;
+      }
+
+      .loading::after {
+        content: "Loading...";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">Calibration Tracker</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="dashboard">Dashboard</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="products">Products</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="gantries">Gantries</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="lanes">Lanes</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="calibrations"
+                >Calibrations</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-page="provers">Provers</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mt-4">
+      <div id="alertArea"></div>
+      <div id="mainContent"></div>
+    </div>
+
+    <!-- Modal for forms -->
+    <div class="modal fade" id="formModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"></h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <!-- Form will be injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const CONFIG = {
+        API_BASE_URL: "http://10.42.0.12:3000/api",
+        DATE_FORMAT: "YYYY-MM-DD",
+        ROUTES: {
+          products: "/product",
+          gantries: "/gantry",
+          lanes: "/lane",
+          calibrations: "/calib",
+        },
+      };
+      const utils = {
+        showAlert: function (message, type = "success") {
+          const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+          $("#alertArea").html(alertHtml);
+          setTimeout(() => {
+            $(".alert").alert("close");
+          }, 5000);
+        },
+
+        formatDate: function (dateString) {
+          if (!dateString) return "";
+          return new Date(dateString).toLocaleDateString();
+        },
+
+        loading: function (selector) {
+          $(selector).addClass("loading");
+        },
+
+        loaded: function (selector) {
+          $(selector).removeClass("loading");
+          $("#mainContent").removeClass("loading");
+        },
+
+        handleApiError: function (error) {
+          console.error("API Error:", error);
+          utils.showAlert(
+            error.responseJSON?.error || "An error occurred",
+            "danger"
+          );
+        },
+      };
+      const products = {
+        loadList: function () {
+          const content = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Products</h2>
+                <button class="btn btn-primary" onclick="products.showForm()">Add Product</button>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsList"></tbody>
+                </table>
+            </div>
+        `;
+
+          $("#mainContent").html(content);
+          this.fetchProducts();
+        },
+
+        fetchProducts: function () {
+          utils.loading("#productsList");
+          console.log("loading");
+          $.get(`${CONFIG.API_BASE_URL}/product`)
+            .done((response) => {
+              const products = response.data;
+              const html = products
+                .map(
+                  (product) => `
+                    <tr>
+                        <td>${product.id}</td>
+                        <td>${product.name}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="products.showForm(${product.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="products.delete(${product.id})">Delete</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join("");
+              $("#productsList").html(html);
+            })
+            .fail(utils.handleApiError)
+            .always(() => utils.loaded("#productsList"));
+        },
+
+        showForm: function (id = null) {
+          const title = id ? "Edit Product" : "Add Product";
+          const formHtml = `
+            <form id="productForm">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Product Name</label>
+                    <input type="text" class="form-control" id="name" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        `;
+
+          $(".modal-title").text(title);
+          $(".modal-body").html(formHtml);
+
+          if (id) {
+            utils.loading(".modal-body");
+            $.get(`${CONFIG.API_BASE_URL}/product/${id}`)
+              .done((response) => {
+                $("#name").val(response.data.name);
+              })
+              .fail(utils.handleApiError)
+              .always(() => utils.loaded(".modal-body"));
+          }
+
+          const modal = new bootstrap.Modal(
+            document.getElementById("formModal")
+          );
+          modal.show();
+
+          $("#productForm").on("submit", function (e) {
+            e.preventDefault();
+            const data = {
+              name: $("#name").val(),
+            };
+
+            const url = id
+              ? `${CONFIG.API_BASE_URL}/product/${id}`
+              : `${CONFIG.API_BASE_URL}/product`;
+            const method = id ? "PUT" : "POST";
+
+            $.ajax({
+              url: url,
+              method: method,
+              data: JSON.stringify(data),
+              contentType: "application/json",
+            })
+              .done(() => {
+                modal.hide();
+                products.loadList();
+                utils.showAlert(
+                  `Product ${id ? "updated" : "created"} successfully`
+                );
+              })
+              .fail(utils.handleApiError);
+          });
+        },
+
+        delete: function (id) {
+          if (confirm("Are you sure you want to delete this product?")) {
+            $.ajax({
+              url: `${CONFIG.API_BASE_URL}/product/${id}`,
+              method: "DELETE",
+            })
+              .done(() => {
+                products.loadList();
+                utils.showAlert("Product deleted successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+      };
+      const gantries = {
+        loadList: function () {
+          const content = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Gantries</h2>
+                <button class="btn btn-primary" onclick="gantries.showForm()">Add Gantry</button>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Product</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gantriesList"></tbody>
+                </table>
+            </div>
+        `;
+
+          $("#mainContent").html(content);
+          this.fetchGantries();
+        },
+
+        fetchGantries: function () {
+          utils.loading("#gantriesList");
+          $.get(`${CONFIG.API_BASE_URL}/gantry`)
+            .done((response) => {
+              const gantries = response.data;
+              const html = gantries
+                .map(
+                  (gantry) => `
+                    <tr>
+                        <td>${gantry.id}</td>
+                        <td>${gantry.name}</td>
+                        <td>${gantry.product?.name || "N/A"}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="gantries.showForm(${
+                              gantry.id
+                            })">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="gantries.delete(${
+                              gantry.id
+                            })">Delete</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join("");
+              $("#gantriesList").html(html);
+            })
+            .fail(utils.handleApiError)
+            .always(() => utils.loaded("#gantriesList"));
+        },
+
+        showForm: function (id = null) {
+          const title = id ? "Edit Gantry" : "Add Gantry";
+          const formHtml = `
+            <form id="gantryForm">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Gantry Name</label>
+                    <input type="text" class="form-control" id="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="productId" class="form-label">Product</label>
+                    <select class="form-control" id="productId" required>
+                        <option value="">Select Product</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        `;
+
+          $(".modal-title").text(title);
+          $(".modal-body").html(formHtml);
+
+          // Load products for dropdown
+          $.get(`${CONFIG.API_BASE_URL}/product`)
+            .done((response) => {
+              const options = response.data
+                .map(
+                  (product) =>
+                    `<option value="${product.id}">${product.name}</option>`
+                )
+                .join("");
+              $("#productId").append(options);
+
+              if (id) {
+                utils.loading(".modal-body");
+                $.get(`${CONFIG.API_BASE_URL}/gantry/${id}`)
+                  .done((response) => {
+                    $("#name").val(response.data.name);
+                    $("#productId").val(response.data.productId);
+                  })
+                  .fail(utils.handleApiError)
+                  .always(() => utils.loaded(".modal-body"));
+              }
+            })
+            .fail(utils.handleApiError);
+
+          const modal = new bootstrap.Modal(
+            document.getElementById("formModal")
+          );
+          modal.show();
+
+          $("#gantryForm").on("submit", function (e) {
+            e.preventDefault();
+            const data = {
+              name: $("#name").val(),
+              productId: parseInt($("#productId").val()),
+            };
+
+            const url = id
+              ? `${CONFIG.API_BASE_URL}/gantry/${id}`
+              : `${CONFIG.API_BASE_URL}/gantry`;
+            const method = id ? "PUT" : "POST";
+
+            $.ajax({
+              url: url,
+              method: method,
+              data: JSON.stringify(data),
+              contentType: "application/json",
+            })
+              .done(() => {
+                modal.hide();
+                gantries.loadList();
+                utils.showAlert(
+                  `Gantry ${id ? "updated" : "created"} successfully`
+                );
+              })
+              .fail(utils.handleApiError);
+          });
+        },
+
+        delete: function (id) {
+          if (confirm("Are you sure you want to delete this gantry?")) {
+            $.ajax({
+              url: `${CONFIG.API_BASE_URL}/gantry/${id}`,
+              method: "DELETE",
+            })
+              .done(() => {
+                gantries.loadList();
+                utils.showAlert("Gantry deleted successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+      };
+      const lanes = {
+        loadList: function () {
+          const content = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Lanes</h2>
+                <button class="btn btn-primary" onclick="lanes.showForm()">Add Lane</button>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Product</th>
+                            <th>Gantry</th>
+                            <th>Make/Model</th>
+                            <th>Serial No</th>
+                            <th>Is Ethanol</th>
+                            <th>Flow Range</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lanesList"></tbody>
+                </table>
+            </div>
+        `;
+
+          $("#mainContent").html(content);
+          this.fetchLanes();
+        },
+
+        fetchLanes: function () {
+          utils.loading("#lanesList");
+          $.get(`${CONFIG.API_BASE_URL}/lane`)
+            .done((response) => {
+              const lanes = response.data;
+              const html = lanes
+                .map(
+                  (lane) => `
+                    <tr>
+                        <td>${lane.id}</td>
+                        <td>${lane.name}</td>
+                        <td>${lane.product?.name || "N/A"}</td>
+                        <td>${lane.gantry?.name || "N/A"}</td>
+                        <td>${lane.make} / ${lane.model}</td>
+                        <td>${lane.serialNo}</td>
+                        <td>${Boolean(lane.isEthanol) ? "Yes" : "No"}</td>
+                        <td>${lane.flowRange}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="lanes.showForm(${
+                              lane.id
+                            })">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="lanes.delete(${
+                              lane.id
+                            })">Delete</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join("");
+              $("#lanesList").html(html);
+            })
+            .fail(utils.handleApiError)
+            .always(() => utils.loaded("#lanesList"));
+        },
+
+        showForm: function (id = null) {
+          const title = id ? "Edit Lane" : "Add Lane";
+          const formHtml = `
+            <form id="laneForm">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Lane Name</label>
+                    <input type="text" class="form-control" id="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="productId" class="form-label">Product</label>
+                    <select class="form-control" id="productId" required>
+                        <option value="">Select Product</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="gantryId" class="form-label">Gantry</label>
+                    <select class="form-control" id="gantryId" required>
+                        <option value="">Select Gantry</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="make" class="form-label">Make</label>
+                    <input type="text" class="form-control" id="make" required>
+                </div>
+                <div class="mb-3">
+                    <label for="model" class="form-label">Model</label>
+                    <input type="text" class="form-control" id="model" required>
+                </div>
+                <div class="mb-3">
+                    <label for="serialNo" class="form-label">Serial Number</label>
+                    <input type="text" class="form-control" id="serialNo" required>
+                </div>
+                <div class="mb-3">
+                    <label for="isEthanol" class="form-label">Is Ethanol</label>
+                    <select class="form-control" id="isEthanol" required>
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="flowRange" class="form-label">Flow Range</label>
+                    <input type="text" class="form-control" id="flowRange" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        `;
+
+          $(".modal-title").text(title);
+          $(".modal-body").html(formHtml);
+
+          // Load products and gantries for dropdowns
+          Promise.all([
+            $.get(`${CONFIG.API_BASE_URL}/product`),
+            $.get(`${CONFIG.API_BASE_URL}/gantry`),
+          ])
+            .then(([productsRes, gantriesRes]) => {
+              const productOptions = productsRes.data
+                .map(
+                  (product) =>
+                    `<option value="${product.id}">${product.name}</option>`
+                )
+                .join("");
+              $("#productId").append(productOptions);
+
+              const gantryOptions = gantriesRes.data
+                .map(
+                  (gantry) =>
+                    `<option value="${gantry.id}">${gantry.name}</option>`
+                )
+                .join("");
+              $("#gantryId").append(gantryOptions);
+
+              if (id) {
+                utils.loading(".modal-body");
+                $.get(`${CONFIG.API_BASE_URL}/lane/${id}`)
+                  .done((response) => {
+                    const lane = response.data;
+                    $("#name").val(lane.name);
+                    $("#productId").val(lane.productId);
+                    $("#gantryId").val(lane.gantryId);
+                    $("#make").val(lane.make);
+                    $("#model").val(lane.model);
+                    $("#serialNo").val(lane.serialNo);
+                    $("#flowRange").val(lane.flowRange);
+                    $("#isEthanol").val(lane.isEthanol.toString());
+                  })
+                  .fail(utils.handleApiError)
+                  .always(() => utils.loaded(".modal-body"));
+              }
+            })
+            .catch(utils.handleApiError);
+
+          const modal = new bootstrap.Modal(
+            document.getElementById("formModal")
+          );
+          modal.show();
+
+          $("#laneForm").on("submit", function (e) {
+            e.preventDefault();
+            const data = {
+              name: $("#name").val(),
+              productId: parseInt($("#productId").val()),
+              gantryId: parseInt($("#gantryId").val()),
+              make: $("#make").val(),
+              model: $("#model").val(),
+              serialNo: $("#serialNo").val(),
+              flowRange: $("#flowRange").val(),
+              isEthanol: $("#isEthanol").val() === "true",
+            };
+
+            const url = id
+              ? `${CONFIG.API_BASE_URL}/lane/${id}`
+              : `${CONFIG.API_BASE_URL}/lane`;
+            const method = id ? "PUT" : "POST";
+
+            $.ajax({
+              url: url,
+              method: method,
+              data: JSON.stringify(data),
+              contentType: "application/json",
+            })
+              .done(() => {
+                modal.hide();
+                lanes.loadList();
+                utils.showAlert(
+                  `Lane ${id ? "updated" : "created"} successfully`
+                );
+              })
+              .fail(utils.handleApiError);
+          });
+        },
+
+        delete: function (id) {
+          if (confirm("Are you sure you want to delete this lane?")) {
+            $.ajax({
+              url: `${CONFIG.API_BASE_URL}/lane/${id}`,
+              method: "DELETE",
+            })
+              .done(() => {
+                lanes.loadList();
+                utils.showAlert("Lane deleted successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+      };
+      const calibrations = {
+        loadList: function () {
+          const content = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Calibrations</h2>
+                <div>
+                    <button class="btn btn-success me-2" onclick="calibrations.initializeAllLanes()">Initialize All Lanes</button>
+                    <button class="btn btn-primary" onclick="calibrations.showForm()">Add Calibration</button>
+                </div>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Lane</th>
+                            <th>Last Calibration</th>
+                            <th>Date Done</th>
+                            <th>K-Factor</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calibrationsList"></tbody>
+                </table>
+            </div>
+        `;
+
+          $("#mainContent").html(content);
+          this.fetchCalibrations();
+        },
+
+        fetchCalibrations: function () {
+          utils.loading("#calibrationsList");
+          $.get(`${CONFIG.API_BASE_URL}/calib`)
+            .done((response) => {
+              const calibrations = response.data;
+              const html = calibrations
+                .map(
+                  (calib) => `
+                    <tr>
+                        <td>${calib.lane?.name || "N/A"}</td>
+                        <td>${utils.formatDate(calib.lastCalibDate)}</td>
+                        <td>${
+                          utils.formatDate(calib.dateDone) || "Pending"
+                        }</td>
+                        <td>${calib.kFactor}</td>
+                        <td>
+                            <span class="badge bg-${this.getStatusColor(
+                              calib.eStatus
+                            )}">
+                                ${calib.eStatus || "Pending"}
+                            </span>
+                        </td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-success" onclick="calibrations.complete(${
+                              calib.id
+                            })">Complete</button>
+                            <button class="btn btn-sm btn-warning" onclick="calibrations.showForm(${
+                              calib.id
+                            })">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="calibrations.delete(${
+                              calib.id
+                            })">Delete</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join("");
+              $("#calibrationsList").html(html);
+            })
+            .fail(utils.handleApiError)
+            .always(() => utils.loaded("#calibrationsList"));
+        },
+
+        getStatusColor: function (status) {
+          switch (status) {
+            case "Calibration Done":
+              return "success";
+            case "PO Issued":
+              return "warning";
+            case "PR Issued":
+              return "info";
+            default:
+              return "secondary";
+          }
+        },
+
+        showForm: function (id = null) {
+          const title = id ? "Edit Calibration" : "Add Calibration";
+          const formHtml = `
+            <form id="calibrationForm">
+                <div class="mb-3">
+                    <label for="laneId" class="form-label">Lane</label>
+                    <select class="form-control" id="laneId" required>
+                        <option value="">Select Lane</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="lastCalibDate" class="form-label">Last Calibration Date</label>
+                    <input type="date" class="form-control" id="lastCalibDate" required>
+                </div>
+                <div class="mb-3">
+                    <label for="kFactor" class="form-label">K-Factor</label>
+                    <input type="number" step="0.000001" class="form-control" id="kFactor" required>
+                </div>
+                <div class="mb-3">
+                    <label for="eStatus" class="form-label">Status</label>
+                    <select class="form-control" id="eStatus">
+                        <option value="">Pending</option>
+                        <option value="PR Issued">PR Issued</option>
+                        <option value="PO Issued">PO Issued</option>
+                        <option value="Calibration Done">Calibration Done</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="remark" class="form-label">Remark</label>
+                    <textarea class="form-control" id="remark"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        `;
+
+          $(".modal-title").text(title);
+          $(".modal-body").html(formHtml);
+
+          // Load lanes for dropdown
+          $.get(`${CONFIG.API_BASE_URL}/lane`)
+            .done((response) => {
+              const options = response.data
+                .map(
+                  (lane) => `<option value="${lane.id}">${lane.name}</option>`
+                )
+                .join("");
+              $("#laneId").append(options);
+
+              if (id) {
+                utils.loading(".modal-body");
+                $.get(`${CONFIG.API_BASE_URL}/calib/${id}`)
+                  .done((response) => {
+                    const calib = response.data;
+                    $("#laneId").val(calib.laneId);
+                    $("#lastCalibDate").val(calib.lastCalibDate.split("T")[0]);
+                    $("#kFactor").val(calib.kFactor);
+                    $("#eStatus").val(calib.eStatus);
+                    $("#remark").val(calib.remark);
+                  })
+                  .fail(utils.handleApiError)
+                  .always(() => utils.loaded(".modal-body"));
+              }
+            })
+            .fail(utils.handleApiError);
+
+          const modal = new bootstrap.Modal(
+            document.getElementById("formModal")
+          );
+          modal.show();
+
+          $("#calibrationForm").on("submit", function (e) {
+            e.preventDefault();
+            const data = {
+              laneId: parseInt($("#laneId").val()),
+              lastCalibDate: $("#lastCalibDate").val(),
+              kFactor: parseFloat($("#kFactor").val()),
+              eStatus: $("#eStatus").val(),
+              remark: $("#remark").val(),
+            };
+
+            const url = id
+              ? `${CONFIG.API_BASE_URL}/calib/${id}`
+              : `${CONFIG.API_BASE_URL}/calib`;
+            const method = id ? "PUT" : "POST";
+
+            $.ajax({
+              url: url,
+              method: method,
+              data: JSON.stringify(data),
+              contentType: "application/json",
+            })
+              .done(() => {
+                modal.hide();
+                calibrations.loadList();
+                utils.showAlert(
+                  `Calibration ${id ? "updated" : "created"} successfully`
+                );
+              })
+              .fail(utils.handleApiError);
+          });
+        },
+
+        complete: function (id) {
+          if (confirm("Mark this calibration as complete?")) {
+            $.post(
+              `${CONFIG.API_BASE_URL}/calib/complete`,
+              JSON.stringify({ id })
+            )
+              .done(() => {
+                calibrations.loadList();
+                utils.showAlert("Calibration marked as complete");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+
+        delete: function (id) {
+          if (confirm("Are you sure you want to delete this calibration?")) {
+            $.ajax({
+              url: `${CONFIG.API_BASE_URL}/calib/${id}`,
+              method: "DELETE",
+            })
+              .done(() => {
+                calibrations.loadList();
+                utils.showAlert("Calibration deleted successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+
+        initializeAllLanes: function () {
+          if (confirm("Initialize calibrations for all lanes?")) {
+            $.post(
+              `${CONFIG.API_BASE_URL}/calib/initialize`,
+              JSON.stringify({ lastCalibDate: new Date(), kFactor: 1.0 })
+            )
+              .done(() => {
+                calibrations.loadList();
+                utils.showAlert("Lanes initialized successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+      };
+
+      const provers = {
+        loadList: function () {
+          const content = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Provers</h2>
+                <button class="btn btn-primary" onclick="provers.showForm()">Add Prover</button>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Make</th>
+                            <th>Model</th>
+                            <th>Serial No</th>
+                            <th>Capacity</th>
+                            <th>Prover Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proversList"></tbody>
+                </table>
+            </div>
+        `;
+
+          $("#mainContent").html(content);
+          this.fetchProvers();
+        },
+
+        fetchProvers: function () {
+          utils.loading("#proversList");
+          $.get(`${CONFIG.API_BASE_URL}/prover`)
+            .done((response) => {
+              const provers = response.data;
+              const html = provers
+                .map(
+                  (prover) => `
+                    <tr>
+                        <td>${prover.id}</td>
+                        <td>${prover.make}</td>
+                        <td>${prover.model}</td>
+                        <td>${prover.serialNo}</td>
+                        <td>${prover.capacity}</td>
+                        <td>${prover.proverType}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="provers.showForm(${prover.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="provers.delete(${prover.id})">Delete</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join("");
+              $("#proversList").html(html);
+            })
+            .fail(utils.handleApiError)
+            .always(() => utils.loaded("#proversList"));
+        },
+
+        showForm: function (id = null) {
+          const title = id ? "Edit Prover" : "Add Prover";
+          const formHtml = `
+            <form id="proverForm">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Prover Name</label>
+                    <input type="text" class="form-control" id="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="make" class="form-label">Make</label>
+                    <input type="text" class="form-control" id="make" required>
+                </div>
+                <div class="mb-3">
+                    <label for="model" class="form-label">Model</label>
+                    <input type="text" class="form-control" id="model" required>
+                </div>
+                <div class="mb-3">
+                    <label for="serialNo" class="form-label">Serial Number</label>
+                    <input type="text" class="form-control" id="serialNo" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="capacity" class="form-label">Capacity</label>
+                    <input type="text" class="form-control" id="capacity" required>
+                </div>
+                <div class="mb-3">
+                    <label for="proverType" class="form-label">Prover Type</label>
+                    <input type="text" class="form-control" id="proverType" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        `;
+
+          $(".modal-title").text(title);
+          $(".modal-body").html(formHtml);
+
+          if (id) {
+            utils.loading(".modal-body");
+            $.get(`${CONFIG.API_BASE_URL}/prover/${id}`)
+              .done((response) => {
+                const prover = response.data;
+                $("#make").val(prover.make);
+                $("#model").val(prover.model);
+                $("#serialNo").val(prover.serialNo);
+                $("#capacity").val(prover.flowRange);
+                $("#proverType").val(prover.flowRange);
+              })
+              .fail(utils.handleApiError)
+              .always(() => utils.loaded(".modal-body"));
+          }
+
+          const modal = new bootstrap.Modal(
+            document.getElementById("formModal")
+          );
+          modal.show();
+
+          $("#proverForm").on("submit", function (e) {
+            e.preventDefault();
+            const data = {
+              make: $("#make").val(),
+              model: $("#model").val(),
+              serialNo: $("#serialNo").val(),
+              flowRange: $("#capacity").val(),
+              flowRange: $("#proverType").val(),
+            };
+
+            const url = id
+              ? `${CONFIG.API_BASE_URL}/prover/${id}`
+              : `${CONFIG.API_BASE_URL}/prover`;
+            const method = id ? "PUT" : "POST";
+
+            $.ajax({
+              url: url,
+              method: method,
+              data: JSON.stringify(data),
+              contentType: "application/json",
+            })
+              .done(() => {
+                modal.hide();
+                provers.loadList();
+                utils.showAlert(
+                  `Prover ${id ? "updated" : "created"} successfully`
+                );
+              })
+              .fail(utils.handleApiError);
+          });
+        },
+
+        delete: function (id) {
+          if (confirm("Are you sure you want to delete this prover?")) {
+            $.ajax({
+              url: `${CONFIG.API_BASE_URL}/prover/${id}`,
+              method: "DELETE",
+            })
+              .done(() => {
+                provers.loadList();
+                utils.showAlert("Prover deleted successfully");
+              })
+              .fail(utils.handleApiError);
+          }
+        },
+      };
+
+      $(document).ready(function () {
+        // Handle navigation
+        $(".nav-link").click(function (e) {
+          e.preventDefault();
+          const page = $(this).data("page");
+          $(".nav-link").removeClass("active");
+          $(this).addClass("active");
+          loadPage(page);
+        });
+
+        // Load dashboard by default
+        loadPage("dashboard");
+      });
+
+      function loadPage(page) {
+        utils.loading("#mainContent");
+
+        switch (page) {
+          case "dashboard":
+            loadDashboard();
+            break;
+          case "products":
+            products.loadList();
+            break;
+          case "gantries":
+            gantries.loadList();
+            break;
+          case "lanes":
+            lanes.loadList();
+            break;
+          case "calibrations":
+            calibrations.loadList();
+            break;
+          case "provers":
+            provers.loadList();
+            break;
+        }
+      }
+
+      function loadDashboard() {
+        const dashboardHtml = `
+        <h2>Dashboard</h2>
+        <div class="row mt-4">
+            <div class="col-md-3 mb-4">
+                <div class="card dashboard-card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Overdue Calibrations</h5>
+                        <p class="card-text" id="overdueCount">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card dashboard-card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Lanes</h5>
+                        <p class="card-text" id="laneCount">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card dashboard-card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Gantries</h5>
+                        <p class="card-text" id="gantryCount">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card dashboard-card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Products</h5>
+                        <p class="card-text" id="productCount">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>Recent Calibrations</h3>
+                <div id="recentCalibrations" class="table-responsive">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    `;
+
+        $("#mainContent").html(dashboardHtml);
+        loadDashboardData();
+      }
+
+      function loadDashboardData() {
+        // Load overdue calibrations
+        $.get(`${CONFIG.API_BASE_URL}/calib/overdue`)
+          .done((response) => {
+            $("#overdueCount").text(response.data.length);
+          })
+          .fail(utils.handleApiError);
+
+        // Load counts
+        $.get(`${CONFIG.API_BASE_URL}/lane`)
+          .done((response) => {
+            $("#laneCount").text(response.data.length);
+          })
+          .fail(utils.handleApiError);
+
+        $.get(`${CONFIG.API_BASE_URL}/gantry`)
+          .done((response) => {
+            $("#gantryCount").text(response.data.length);
+          })
+          .fail(utils.handleApiError);
+
+        $.get(`${CONFIG.API_BASE_URL}/product`)
+          .done((response) => {
+            $("#productCount").text(response.data.length);
+          })
+          .fail(utils.handleApiError);
+
+        // Load recent calibrations
+        $.get(`${CONFIG.API_BASE_URL}/calib/latest`)
+          .done((response) => {
+            const calibrations = response.data;
+            const tableHtml = `
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Lane</th>
+                            <th>Last Calibration</th>
+                            <th>K-Factor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${calibrations
+                          .map(
+                            (calib) => `
+                            <tr>
+                                <td>${calib.lane.name}</td>
+                                <td>${utils.formatDate(
+                                  calib.lastCalibDate
+                                )}</td>
+                                <td>${calib.kFactor}</td>
+                                <td>
+                                    <span class="badge bg-${
+                                      calib.eStatus ? "success" : "warning"
+                                    }">
+                                        ${calib.eStatus || "Pending"}
+                                    </span>
+                                </td>
+                            </tr>
+                        `
+                          )
+                          .join("")}
+                    </tbody>
+                </table>
+            `;
+            $("#recentCalibrations").html(tableHtml);
+          })
+          .fail(utils.handleApiError);
+
+        utils.loaded("#mainContent");
+      }
+    </script>
+  </body>
+</html>
