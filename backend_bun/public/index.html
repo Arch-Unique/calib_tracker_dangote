@@ -943,10 +943,6 @@
           const formHtml = `
             <form id="proverForm">
                 <div class="mb-3">
-                    <label for="name" class="form-label">Prover Name</label>
-                    <input type="text" class="form-control" id="name" required>
-                </div>
-                <div class="mb-3">
                     <label for="make" class="form-label">Make</label>
                     <input type="text" class="form-control" id="make" required>
                 </div>
@@ -982,8 +978,8 @@
                 $("#make").val(prover.make);
                 $("#model").val(prover.model);
                 $("#serialNo").val(prover.serialNo);
-                $("#capacity").val(prover.flowRange);
-                $("#proverType").val(prover.flowRange);
+                $("#capacity").val(prover.capacity);
+                $("#proverType").val(prover.proverType);
               })
               .fail(utils.handleApiError)
               .always(() => utils.loaded(".modal-body"));
@@ -1000,8 +996,8 @@
               make: $("#make").val(),
               model: $("#model").val(),
               serialNo: $("#serialNo").val(),
-              flowRange: $("#capacity").val(),
-              flowRange: $("#proverType").val(),
+              capacity: $("#capacity").val(),
+              proverType: $("#proverType").val(),
             };
 
             const url = id

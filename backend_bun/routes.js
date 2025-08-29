@@ -4,6 +4,8 @@ import { laneController } from './controllers/lane.js';
 import { gantryController } from './controllers/gantry.js';
 import { proverController } from './controllers/prover.js';
 import {externalCalibrationController} from './controllers/calib.js';
+import {uploadController} from './controllers/upload.js';
+import { batchController } from './controllers/batch.js';
 
 const allRoutes = new Hono();
 allRoutes.get('/product', productController.getAll);
@@ -40,5 +42,17 @@ allRoutes.post('/calib/complete', externalCalibrationController.completeCalibrat
 allRoutes.post('/calib', externalCalibrationController.create);
 allRoutes.put('/calib/:id', externalCalibrationController.update);
 allRoutes.delete('/calib/:id', externalCalibrationController.delete);
+
+allRoutes.post('/upload/external_check', uploadController.uploadExternalCheck);
+allRoutes.post('/upload/calibration_certificate', uploadController.uploadCalibrationCertificate);
+allRoutes.post('/upload/purchase_order', uploadController.uploadPurchaseOrder);
+allRoutes.post('/upload/batch', uploadController.uploadRuns);
+
+allRoutes.get('/batch', batchController.getAll);
+allRoutes.get('/batch/:id', batchController.getById);
+allRoutes.get('/batch/lane/:laneId', batchController.getByLaneId);
+allRoutes.post('/batch', batchController.create);
+allRoutes.put('/batch/:id', batchController.update);
+allRoutes.delete('/batch/:id', batchController.delete);
 
 export default allRoutes;

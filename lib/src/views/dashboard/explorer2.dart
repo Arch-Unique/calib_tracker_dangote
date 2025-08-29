@@ -123,7 +123,7 @@ class LaneTableWidget extends StatelessWidget {
     "Due Date",
     "KFactor",
   ];
-  static const double laneWidth = 390;
+  static const double laneWidth = 420;
   final controller = Get.find<AppController>();
 
   @override

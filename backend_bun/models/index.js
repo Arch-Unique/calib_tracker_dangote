@@ -3,6 +3,7 @@ import Gantry from './gantry.js';
 import Lane from './lane.js';
 import ExternalCalibration from './calib.js';
 import Prover from './prover.js';
+import Batch from './batch.js';
 
 // Define associations
 Product.hasMany(Gantry, { foreignKey: 'productId', as: 'gantries' });
@@ -17,4 +18,10 @@ Lane.belongsTo(Gantry, { foreignKey: 'gantryId', as: 'gantry', });
 Lane.hasMany(ExternalCalibration, { foreignKey: 'laneId', as: 'calibrations' });
 ExternalCalibration.belongsTo(Lane, { foreignKey: 'laneId', as: 'lane' });
 
-export { Product, Gantry, Lane, ExternalCalibration,Prover };
+Lane.hasMany(Batch, { foreignKey: 'laneId', as: 'batches' });
+Batch.belongsTo(Lane, { foreignKey: 'laneId', as: 'lane' });
+
+Prover.hasMany(Batch, { foreignKey: 'proverId', as: 'batches' });
+Batch.belongsTo(Prover, { foreignKey: 'proverId', as: 'prover' });
+
+export { Product, Gantry, Lane, ExternalCalibration,Prover,Batch };

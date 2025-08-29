@@ -95,7 +95,8 @@ class Lane {
       isEthanol: json['isEthanol'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
-      product: json['product'] != null ? Product.fromJson(json['product']) : null,
+      product:
+          json['product'] != null ? Product.fromJson(json['product']) : null,
       gantry: json['gantry'] != null ? Gantry.fromJson(json['gantry']) : null,
     );
   }
@@ -141,7 +142,8 @@ class Calibration {
       calibPath: json['calibPath'],
       poPath: json['poPath'],
       lastCalibDate: DateTime.parse(json['lastCalibDate']),
-      dateDone: json['dateDone'] != null ? DateTime.parse(json['dateDone']) : null,
+      dateDone:
+          json['dateDone'] != null ? DateTime.parse(json['dateDone']) : null,
       kFactor: json['kFactor'].toDouble(),
       laneId: json['laneId'],
       eStatus: json['eStatus'] ?? '',
@@ -169,37 +171,39 @@ class Calibration {
   }
 
   LaneEntry toLaneEntry() {
-  return LaneEntry(
-    lane?.name ?? '',
-    active: isActive,
-    certPath: certPath ?? '',
-    ecalibPath: calibPath ?? '',
-    poPath: poPath ?? '',
-    eStatus: 0,  // You might want to map eStatus string to int based on your logic
-    kfactor: kFactor,
-    remarks: remark ?? '',
-    isEthanol: lane?.isEthanol ?? false,
-    dateDone: dateDone,
-    product: lane?.product?.name ?? "",
-    lastCalibDate: lastCalibDate,
-    // Following fields are left empty as they're not in Calibration
-    lastDoneDate: null,
-    dateDue: null,
-    oldDateDue: null,
-    calibDate: null,
-    correctionFactor: 0,
-    postponeDays: 0,
-    iid: 0,
-    eid: id,  // Using calibration id as external id
-  );
-}
+    return LaneEntry(
+      lane?.name ?? '',
+      active: isActive,
+      certPath: certPath ?? '',
+      ecalibPath: calibPath ?? '',
+      poPath: poPath ?? '',
+      eStatus:
+          0, // You might want to map eStatus string to int based on your logic
+      kfactor: kFactor,
+      remarks: remark ?? '',
+      isEthanol: lane?.isEthanol ?? false,
+      dateDone: dateDone,
+      product: lane?.product?.name ?? "",
+      lastCalibDate: lastCalibDate,
+      // Following fields are left empty as they're not in Calibration
+      lastDoneDate: null,
+      dateDue: null,
+      oldDateDue: null,
+      calibDate: null,
+      correctionFactor: 0,
+      postponeDays: 0,
+      iid: 0,
+      eid: id, // Using calibration id as external id
+    );
+  }
 }
 
 class ApiClient {
   final Dio _dio;
   final String baseUrl;
 
-  ApiClient({required this.baseUrl}) : _dio = Dio(BaseOptions(baseUrl: baseUrl));
+  ApiClient({required this.baseUrl})
+      : _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   // Get latest calibrations
   Future<List<Calibration>> getLatestCalibrations() async {
@@ -208,7 +212,7 @@ class ApiClient {
       final List<dynamic> data = response.data['data'];
       return data.map((json) => Calibration.fromJson(json)).toList();
     } catch (e) {
-      throw Exception('Failed to fetch latest calibrations: $e');
+      return [];
     }
   }
 
@@ -231,7 +235,7 @@ class ApiClient {
       final List<dynamic> data = response.data['data'];
       return data.map((json) => Lane.fromJson(json)).toList();
     } catch (e) {
-      throw Exception('Failed to fetch lanes: $e');
+      return [];
     }
   }
 
@@ -242,7 +246,7 @@ class ApiClient {
       final List<dynamic> data = response.data['data'];
       return data.map((json) => Gantry.fromJson(json)).toList();
     } catch (e) {
-      throw Exception('Failed to fetch gantries: $e');
+      return [];
     }
   }
 
@@ -253,7 +257,7 @@ class ApiClient {
       final List<dynamic> data = response.data['data'];
       return data.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      throw Exception('Failed to fetch products: $e');
+      return [];
     }
   }
 }
